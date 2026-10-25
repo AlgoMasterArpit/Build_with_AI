@@ -9,6 +9,7 @@ ACTION_LABELS = {
     ("retake", "unreadable_serial"): "Serial nahi padha: retake",
     ("new_photo", "unclear_photos"): "Digit unclear: nayi photo",
     ("review", "backwards"): "Reading pichhli se kam: review",
+    ("retake", "caretaker_said_no"): "Caretaker ne mana kiya: retake",
 }
 
 
