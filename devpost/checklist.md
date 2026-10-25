@@ -59,7 +59,7 @@ Build mode: fast
   Learner check: Keep sending glare photos for one room until it goes to review, then reopen it and save a good reading; say whether the orange card's wording feels right.
   Commit: `feat: agent limits, review records and safe resend`
 
-- [ ] **6. A new meter can be linked to a room from one photo**
+- [x] **6. A new meter can be linked to a room from one photo**
   Becomes usable: A "Meter jodna hai" room opens the Add Meter screen; after a photo the confirm screen shows the serial and first reading with "Ye meter Room 205 ka hai?"; Haan, jodo links it in one transaction and saves the baseline; an unreadable serial gets 3 tries then review; a serial already linked elsewhere is refused.
   Why now: 204/205 must be registered from real photos on Oct 26 between 13:00 and 15:00 so the evening demo has a real previous reading.
   PRD ref: `prd.md > Add Meter`
