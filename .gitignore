@@ -12,3 +12,4 @@ __pycache__/
 .pytest_cache/
 /models/*.onnx
 /probe_out/
+/.playwright-mcp/
