@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 
 from app.config import Settings
 from app.domain.rounds import Room
+from app.domain.sessions import Session
 
 
 def token_hash(token: str) -> str:
@@ -87,6 +88,23 @@ class Table:
     def get_room(self, hostel_id: str, room_id: str) -> Room | None:
         item = self.table.get_item(Key=room_key(hostel_id, room_id)).get("Item")
         return Room.model_validate(_strip(item)) if item else None
+
+    def put_session(self, session: Session) -> None:
+        self.table.put_item(
+            Item={
+                "PK": f"SESSION#{session.session_id}",
+                "SK": "SESSION",
+                "data": session.model_dump_json(),
+                "expires_at": session.expires_at,
+            }
+        )
+
+    def get_session(self, session_id: str, now: int) -> Session | None:
+        item = self.table.get_item(Key={"PK": f"SESSION#{session_id}", "SK": "SESSION"}).get("Item")
+        if not item:
+            return None
+        session = Session.model_validate_json(str(item["data"]))
+        return None if session.expired(now) else session
 
     def list_rooms(self, hostel_id: str) -> list[Room]:
         response = self.table.query(
