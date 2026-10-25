@@ -1,9 +1,19 @@
 import { api, ApiError, token } from "./api.js";
+import { CameraError, capturePhoto, closeCamera, openCamera } from "./camera.js";
 import { h, render } from "./dom.js";
+import { cameraScreen } from "./screens/camera.js";
+import { actionBar, photoPanel } from "./screens/result.js";
 import { roomScreen } from "./screens/room.js";
 import { roomsScreen } from "./screens/rooms.js";
 
 const app = /** @type {HTMLElement} */ (document.getElementById("app"));
+
+/** @type {{roomId: string, room: any, sessionId: string} | null} */
+let visit = null;
+/** @type {MediaStream | null} */
+let stream = null;
+
+const goRooms = () => { location.hash = "#/rooms"; };
 
 function notice(title, message, action) {
   render(app, h("section", { class: "notice" },
@@ -15,6 +25,9 @@ function notice(title, message, action) {
 function failed(error) {
   if (error instanceof ApiError && error.code === "invalid_link") {
     notice("Link kaam nahi kar raha", error.message);
+  } else if (error instanceof ApiError && error.code === "session_expired") {
+    visit = null;
+    notice("Session purana ho gaya", error.message, { label: "Rooms pe wapas", run: goRooms });
   } else {
     notice("Kuch gadbad hui", error.message ?? String(error),
       { label: "Dobara try karo", run: () => route() });
@@ -22,6 +35,7 @@ function failed(error) {
 }
 
 async function showRooms() {
+  visit = null;
   const round = await api("/round");
   render(app, roomsScreen(round, (roomId) => { location.hash = `#/room/${roomId}`; }));
 }
@@ -29,17 +43,129 @@ async function showRooms() {
 async function showRoom(roomId) {
   const room = await api(`/rooms/${encodeURIComponent(roomId)}`);
   render(app, ...roomScreen(room, {
-    back: () => { location.hash = "#/rooms"; },
+    back: goRooms,
     takePhoto: () => { location.hash = `#/camera/${roomId}`; },
   }));
 }
 
+async function startVisit(roomId) {
+  if (visit?.roomId === roomId) return visit;
+  const room = await api(`/rooms/${encodeURIComponent(roomId)}`);
+  const session = await api(`/rooms/${encodeURIComponent(roomId)}/sessions`, { method: "POST" });
+  visit = { roomId, room, sessionId: session.session_id };
+  return visit;
+}
+
+async function showCamera(roomId, hint) {
+  const current = await startVisit(roomId);
+  const screen = cameraScreen({
+    roomId,
+    hint: hint ?? current.room.hint,
+    onCancel: () => { location.hash = `#/room/${roomId}`; },
+    onShoot: async () => {
+      if (!stream) return;
+      screen.setBusy(true);
+      try {
+        const blob = await capturePhoto(stream, screen.video);
+        closeCamera(stream);
+        stream = null;
+        await submit(blob, crypto.randomUUID());
+      } catch (error) {
+        screen.setBusy(false);
+        failed(error);
+      }
+    },
+  });
+  render(app, screen.element);
+  try {
+    stream = await openCamera(screen.video);
+  } catch (error) {
+    if (error instanceof CameraError) {
+      notice("Camera nahi khula", error.message,
+        { label: "Dobara try karo", run: () => showCamera(roomId, hint) });
+      return;
+    }
+    throw error;
+  }
+}
+
+async function submit(blob, photoId) {
+  const url = URL.createObjectURL(blob);
+  const panel = photoPanel(url, null, "Photo check ho rahi hai…", "info");
+  render(app, h("section", { class: "result" }, panel.panel));
+  const form = new FormData();
+  form.append("photo", blob, "photo.jpg");
+  form.append("client_photo_id", photoId);
+  form.append("location", "{}");
+  let result;
+  try {
+    result = await api(`/sessions/${visit?.sessionId}/photos`, { body: form, timeoutMs: 60000 });
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 0 || error.status >= 500)) {
+      panel.say("Photo nahi gayi. Network check karke dobara bhejo.", "problem");
+      app.append(actionBar("Dobara bhejo", () => submit(blob, photoId)));
+      return;
+    }
+    throw error;
+  }
+  showResult(url, result);
+}
+
+function showResult(url, result) {
+  const roomId = visit?.roomId ?? "";
+  const problem = result.action === "retake" || result.action === "new_photo";
+  const tone = problem ? "problem" : result.action === "review" ? "review" : "ok";
+  const panel = photoPanel(url, result, result.hint, tone);
+  const body = [panel.panel];
+
+  if (result.action === "save" || result.action === "confirm") {
+    body.push(h("div", { class: "reading-block" },
+      h("span", {}, "Reading"),
+      h("span", { class: "reading mono" }, result.display?.text ?? "")));
+  }
+  if (result.action === "review") {
+    body.push(h("div", { class: "review-card" },
+      h("h1", {}, `Room ${roomId} review ke liye bhej diya`),
+      h("p", {}, result.reason),
+      h("p", {}, "Reading save nahi hui. Aap agle room pe ja sakte ho.")));
+  }
+
+  const bar = problem
+    ? actionBar("Dobara photo lo", () => showCamera(roomId, result.hint).catch(failed))
+    : result.action === "review"
+      ? actionBar("Agle room pe jao", goRooms)
+      : actionBar("Rooms pe wapas", goRooms);
+  render(app, h("section", { class: "result" }, ...body), bar);
+  playSteps(panel, result, tone);
+}
+
+function playSteps(panel, result, tone) {
+  const reread = result.steps?.find((s) => s.step === "reread");
+  const first = result.steps?.find((s) => s.step === "perceive");
+  if (!reread || !first || !result.display) {
+    panel.redraw();
+    return;
+  }
+  const threshold = result.display.threshold;
+  const unclear = first.confidences.map((c, i) => (c < threshold ? i : -1)).filter((i) => i >= 0);
+  const finalHint = result.hint;
+  panel.say("Ek digit saaf nahi, dobara padh raha hoon.", "info");
+  panel.redraw({ confidences: first.confidences, unclear });
+  setTimeout(() => {
+    panel.redraw();
+    panel.say(finalHint, tone);
+  }, 1400);
+}
+
 const routes = [
+  [/^#\/camera\/([^/]+)$/, (roomId) => showCamera(roomId)],
   [/^#\/room\/([^/]+)$/, showRoom],
-  [/^(#\/rooms)?$/, showRooms],
+  [/^(?:#\/rooms)?$/, showRooms],
 ];
 
 async function route() {
+  closeCamera(stream);
+  stream = null;
   if (!token) {
     notice("Link kaam nahi kar raha", "Ye link sahi nahi hai, admin se naya link maango.");
     return;
@@ -47,7 +173,7 @@ async function route() {
   const hash = location.hash;
   const match = routes.find(([pattern]) => pattern.test(hash));
   if (!match) {
-    location.hash = "#/rooms";
+    goRooms();
     return;
   }
   render(app, h("p", { class: "loading" }, "Load ho raha hai…"));
