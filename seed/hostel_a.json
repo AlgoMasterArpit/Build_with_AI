@@ -1,0 +1,21 @@
+{
+  "_note": "Sample data for the demo. Rooms 204 and 205 have no meter on purpose: they are linked from real photos through Add Meter.",
+  "hostel_id": "hostel-a",
+  "name": "Hostel A",
+  "caretaker": "Caretaker",
+  "meter_type": "electricity",
+  "rooms": [
+    {"room_id": "201", "meter_serial": "SAMPLE10201", "previous_reading": "01204", "previous_at": "2026-09-30"},
+    {"room_id": "202", "meter_serial": "SAMPLE10202", "previous_reading": "00987", "previous_at": "2026-09-30"},
+    {"room_id": "203", "meter_serial": "SAMPLE10203", "previous_reading": "01562", "previous_at": "2026-09-30"},
+    {"room_id": "204"},
+    {"room_id": "205"},
+    {"room_id": "206", "meter_serial": "SAMPLE10206", "previous_reading": "00811", "previous_at": "2026-09-30"},
+    {"room_id": "207", "meter_serial": "SAMPLE10207", "previous_reading": "02033", "previous_at": "2026-09-30"},
+    {"room_id": "208", "meter_serial": "SAMPLE10208", "previous_reading": "01418", "previous_at": "2026-09-30"},
+    {"room_id": "209", "meter_serial": "SAMPLE10209", "previous_reading": "00692", "previous_at": "2026-09-30"},
+    {"room_id": "210", "meter_serial": "SAMPLE10210", "previous_reading": "01775", "previous_at": "2026-09-30"},
+    {"room_id": "211", "meter_serial": "SAMPLE10211", "previous_reading": "01120", "previous_at": "2026-09-30"},
+    {"room_id": "212", "meter_serial": "SAMPLE10212", "previous_reading": "00954", "previous_at": "2026-09-30"}
+  ]
+}
