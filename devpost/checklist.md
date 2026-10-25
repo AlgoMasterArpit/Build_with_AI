@@ -113,3 +113,4 @@ Activity mode: not started
 ## Revisions
 - Slice 2 started before slice 1's real-photo probe — the learner's 204/205 photos were not yet available; slice 1 stays unchecked until the probe runs on them, and slice 2 does not depend on OCR results.
 - Slice 7 code and fake-provider tests are done, but its live check waits for the learner's Gemini key; the box stays open until one real call shows decided_by: llm.
+- Slice 8's tunnel check could not run from the agent: the network blocks Cloudflare's tunnel port and the agent is not allowed to open public tunnels. The learner runs the tunnel from a phone hotspot during the corridor test; the box stays open until then.
