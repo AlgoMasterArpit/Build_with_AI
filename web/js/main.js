@@ -89,8 +89,10 @@ async function showCamera(roomId, hint) {
     },
   });
   render(app, screen.element);
+  screen.setBusy(true);
   try {
     stream = await openCamera(screen.video);
+    screen.setBusy(false);
   } catch (error) {
     if (error instanceof CameraError) {
       notice("Camera nahi khula", error.message,
@@ -134,10 +136,18 @@ function showResult(url, result) {
   if (result.saved) {
     body.push(savedCard(result.saved), agentSteps(result.summary));
     navigator.vibrate?.(60);
-  } else if (result.action === "confirm") {
-    body.push(h("div", { class: "reading-block" },
-      h("span", {}, "Reading"),
-      h("span", { class: "reading mono" }, result.display?.text ?? "")));
+  } else if (result.action === "confirm" && result.confirm) {
+    const { serial, serial_last4: tail, reading } = result.confirm;
+    body.push(h("section", { class: "confirm-card" },
+      h("p", { class: "serial-line mono" }, `SN-${serial.slice(0, -4)}`, h("span", { class: "tail" }, tail)),
+      h("p", {}, "Pehli reading: ", h("strong", { class: "mono" }, reading)),
+      h("h1", {}, `Ye meter Room ${roomId} ka hai?`)));
+    render(app, h("section", { class: "result" }, ...body),
+      h("div", { class: "action-bar two" },
+        h("button", { class: "button secondary", onClick: () => answer("no") }, "Nahi, dobara photo lo"),
+        h("button", { class: "button", onClick: () => answer("yes") }, "Haan, jodo")));
+    panel.redraw();
+    return;
   }
   if (result.action === "review") {
     body.push(h("div", { class: "review-card" },
@@ -154,6 +164,31 @@ function showResult(url, result) {
       : actionBar("Rooms pe wapas", goRooms);
   render(app, h("section", { class: "result" }, ...body), bar);
   playSteps(panel, result, tone, line);
+}
+
+async function answer(choice) {
+  const roomId = visit?.roomId ?? "";
+  const buttons = app.querySelectorAll(".action-bar .button");
+  buttons.forEach((b) => { b.disabled = true; });
+  try {
+    const result = await api(`/sessions/${visit?.sessionId}/confirm`, { json: { answer: choice } });
+    if (choice === "no") {
+      await showCamera(roomId, result.hint);
+      return;
+    }
+    navigator.vibrate?.(60);
+    visit = null;
+    render(app,
+      h("section", { class: "result" }, h("h2", {}, `Room ${roomId}`), savedCard(result.saved), agentSteps(result.summary)),
+      actionBar("Agle room pe jao", goRooms));
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "meter_taken") {
+      visit = null;
+      notice("Meter pehle se juda hai", error.message, { label: "Rooms pe wapas", run: goRooms });
+      return;
+    }
+    failed(error);
+  }
 }
 
 function playSteps(panel, result, tone, finalLine) {
