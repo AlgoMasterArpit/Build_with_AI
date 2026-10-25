@@ -14,6 +14,7 @@ dependencies = [
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
     "python-multipart>=0.0.32",
+    "tzdata>=2026.5",
 ]
 
 [dependency-groups]
@@ -22,8 +23,8 @@ dev = [
     "ruff",
     "mypy",
     "moto[server]>=5.2.4",
-    "httpx>=0.28.1",
     "boto3-stubs>=1.43.118",
+    "httpx2>=2.16.0",
 ]
 
 [tool.uv]
