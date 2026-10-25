@@ -39,7 +39,7 @@ Build mode: fast
   Learner check: On the laptop (localhost allows the camera), open Room 205, hold up a meter photo with glare and then a clear one, and say whether the hint and the boxes make sense to you.
   Commit: `feat: live capture with quality hints and straightened digit reading`
 
-- [ ] **4. Wrong meter is caught, an unclear digit is re-read, and a reading is saved with units, CO₂ and the agent trace**
+- [x] **4. Wrong meter is caught, an unclear digit is re-read, and a reading is saved with units, CO₂ and the agent trace**
   Becomes usable: Photographing Room 204's meter on Room 205 shows "Ye Room 205 ka meter nahi hai, board pe …4821 dhoondho"; a low-confidence digit turns yellow, is re-read automatically and turns green; a good reading shows the Saved card with units, CO₂ (when a factor exists) and the Agent ne kya kiya list, and the room turns Ho gaya. Reopening a Ho gaya room shows its Saved card.
   Why now: Completes the one-minute demo journey on the rules path, so a recordable demo exists before any optional work.
   PRD ref: `prd.md > Right-Meter Check`, `prd.md > Reading the Display`, `prd.md > Saving a Reading`, `prd.md > Rooms List`
@@ -49,7 +49,7 @@ Build mode: fast
   Learner check: Run the demo sequence on the laptop with your photos and say whether the Saved card and the Agent ne kya kiya list tell the story you want the video to tell.
   Commit: `feat: serial check, automatic re-read and saved reading with trace`
 
-- [ ] **5. When the agent gives up, the room goes to review and the caretaker moves on**
+- [x] **5. When the agent gives up, the room goes to review and the caretaker moves on**
   Becomes usable: Each limit from the PRD table ends in the orange Review card with a one-line reason and "Agle room pe jao"; a review record with photos and trace is saved; the room shows Review mein and can be reopened with fresh limits; a reading lower than the previous one goes straight to review; a failed upload offers Dobara bhejo without double-saving.
   Why now: Makes the "caretaker kabhi atakta nahi" promise true before the phone test, where bad light and weak WiFi will actually happen.
   PRD ref: `prd.md > Agent Limits and Review`, `prd.md > Saving a Reading`, `prd.md > States and Boundaries`
