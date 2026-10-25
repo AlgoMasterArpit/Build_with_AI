@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
 import cv2
+import numpy as np
 
 from app.vision import reread as variants
 from app.vision import serials, sevenseg
@@ -56,6 +58,28 @@ class Analysis:
             data["display"]["unclear_positions"] = self.display.unclear_positions
         return data
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Analysis:
+        quality = {k: v for k, v in data["quality"].items() if k != "ok"}
+        quality["glare_boxes"] = [tuple(b) for b in quality.get("glare_boxes", [])]
+        return cls(
+            width=data["width"],
+            height=data["height"],
+            quality=QualityReport(**quality),
+            display=text_read_from_dict(data["display"]),
+            serial=text_read_from_dict(data["serial"]),
+            serial_status=data["serial_status"],
+            texts=[r for r in map(text_read_from_dict, data.get("texts", [])) if r],
+            timings_ms=data.get("timings_ms", {}),
+        )
+
+
+def text_read_from_dict(data: dict[str, Any] | None) -> TextRead | None:
+    if not data:
+        return None
+    fields = {k: v for k, v in data.items() if k != "unclear_positions"}
+    return TextRead(**fields)
+
 
 def _digit_share(text: str) -> float:
     return sum(c.isdigit() for c in text) / len(text) if text else 0.0
@@ -81,8 +105,13 @@ class MeterReader:
     def __init__(self, models_dir: Path) -> None:
         self._detector = TextDetector(models_dir)
         self._recognizer = TextRecognizer(models_dir)
+        self._lock = threading.Lock()
 
     def analyze(self, image: Image, expected_serial: str | None = None) -> Analysis:
+        with self._lock:
+            return self._analyze(image, expected_serial)
+
+    def _analyze(self, image: Image, expected_serial: str | None) -> Analysis:
         timings: dict[str, float] = {}
         started = time.perf_counter()
 
@@ -123,7 +152,9 @@ class MeterReader:
 
     def reread(self, image: Image, display: TextRead, variant: str) -> TextRead:
         crop = variants.apply(variant, straighten(image, display.quad))
-        return _merge(display, self._recognizer.read(crop, DIGITS), variant)
+        with self._lock:
+            recognition = self._recognizer.read(crop, DIGITS)
+        return _merge(display, recognition, variant)
 
     def _pick_display(
         self, image: Image, reads: list[tuple[TextRead, TextRead]]
@@ -166,4 +197,12 @@ def load_image(path: Path) -> Image:
     image = cv2.imread(str(path), cv2.IMREAD_COLOR)
     if image is None:
         raise ValueError(f"not an image: {path}")
+    return image
+
+
+def decode_image(data: bytes) -> Image | None:
+    buffer = np.frombuffer(data, dtype=np.uint8)
+    image = cv2.imdecode(buffer, cv2.IMREAD_COLOR) if buffer.size else None
+    if image is None or image.ndim != 3 or min(image.shape[:2]) < 200:
+        return None
     return image
