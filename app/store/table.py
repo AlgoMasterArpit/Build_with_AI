@@ -33,9 +33,7 @@ def _strip(item: dict[str, Any]) -> dict[str, Any]:
 
 class Table:
     def __init__(self, settings: Settings) -> None:
-        resource = boto3.resource(
-            "dynamodb", region_name=settings.aws_region, endpoint_url=settings.aws_endpoint_url
-        )
+        resource = boto3.resource("dynamodb", **settings.aws_kwargs())  # type: ignore[call-overload]
         self.client = resource.meta.client
         self.name = settings.table_name
         self.table = resource.Table(settings.table_name)

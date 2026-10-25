@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 24
     max_photo_bytes: int = 15 * 1024 * 1024
 
+    def aws_kwargs(self) -> dict[str, str | None]:
+        kwargs: dict[str, str | None] = {"region_name": self.aws_region}
+        if self.aws_endpoint_url:
+            # A local moto server accepts any credentials; never send real ones to it.
+            kwargs |= {
+                "endpoint_url": self.aws_endpoint_url,
+                "aws_access_key_id": "local",
+                "aws_secret_access_key": "local",
+            }
+        return kwargs
+
 
 @lru_cache
 def get_settings() -> Settings:
