@@ -4,7 +4,7 @@ import json
 import time
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
@@ -25,6 +25,7 @@ from app.store.table import Conflict, Table
 from app.vision.client import build_vision
 from app.vision.geometry import split_quad
 from app.vision.pipeline import DIGIT_CONFIDENCE_THRESHOLD, decode_image
+from app.vision.serials import last4, normalize
 
 router = APIRouter(prefix="/api")
 
@@ -32,6 +33,9 @@ SESSION_GONE = ApiError(404, "session_expired", "Session purana ho gaya, room do
 NOT_A_PHOTO = ApiError(422, "not_a_photo", "Photo padh nahi paaye, dobara lo.")
 TOO_LARGE = ApiError(413, "photo_too_large", "Photo bahut badi hai, dobara lo.")
 ROOM_DONE = ApiError(409, "room_done", "Is room ki reading is mahine ho chuki hai.")
+NOTHING_TO_CONFIRM = ApiError(409, "nothing_to_confirm", "Pehle meter ki photo lo.")
+METER_TAKEN = ApiError(409, "meter_taken", "Ye meter kisi aur room se jud chuka hai.")
+ROOM_HAS_METER = ApiError(409, "room_has_meter", "Is room ka meter pehle hi juda hai.")
 BACKWARDS_REASON = "Reading pichhli se kam hai."
 
 
@@ -155,7 +159,11 @@ def submit_photo(
     )
     session.photo_keys.append(key)
 
-    run = get_agent(request).run(image, session, room.meter_serial)
+    def owner_elsewhere(serial_text: str) -> str | None:
+        owner = table.meter_owner(normalize(serial_text))
+        return owner if owner and owner != session.room_id else None
+
+    run = get_agent(request).run(image, session, room.meter_serial, owner_elsewhere)
     _guard_backwards(run, room)
     session.trace.extend({"photo": index, **s} for s in run.steps)
 
@@ -232,6 +240,12 @@ def _finish(
 ) -> dict[str, Any]:
     action = run.decision.action
     display = run.analysis.display
+    if action == Action.CONFIRM and display is not None and run.analysis.serial is not None:
+        serial = normalize(run.analysis.serial.text)
+        session.pending_meter = {"serial": serial, "reading": display.text}
+        return {
+            "confirm": {"serial": serial, "serial_last4": last4(serial), "reading": display.text}
+        }
     if action == Action.SAVE and display is not None:
         units = consumption(room.previous_reading, display.text)
         record = _record(
@@ -273,3 +287,64 @@ def _location(raw: str) -> str:
         return f"{lat:.6f},{lon:.6f},{float(data.get('accuracy', 0)):.0f}"
     except (ValueError, KeyError, TypeError):
         return "nahi mili"
+
+
+class ConfirmAnswer(BaseModel):
+    answer: Literal["yes", "no"]
+
+
+@router.post("/sessions/{session_id}/confirm")
+def confirm_meter(
+    session_id: str, body: ConfirmAnswer, ctx: RoundDep, table: TableDep, settings: SettingsDep
+) -> dict[str, Any]:
+    session = _session(table, ctx, session_id)
+    pending = session.pending_meter
+    if session.mode != Mode.ADD_METER or not pending:
+        raise NOTHING_TO_CONFIRM
+    room = table.get_room(ctx.hostel_id, session.room_id)
+    if room is None:
+        raise UNKNOWN_ROOM
+
+    session.pending_meter = None
+    if body.answer == "no":
+        session.trace.append(
+            {
+                "step": "decide",
+                "action": "retake",
+                "reason": "caretaker_said_no",
+                "decided_by": "human",
+                "hint": "Sahi meter ki photo lo.",
+                "ms": 0.0,
+            }
+        )
+        table.put_session(session)
+        return {"action": "retake", "hint": "Theek hai, sahi meter ki photo lo."}
+
+    session.trace.append(
+        {
+            "step": "decide",
+            "action": "linked",
+            "reason": "caretaker_confirmed",
+            "decided_by": "human",
+            "hint": "Meter joda",
+            "ms": 0.0,
+        }
+    )
+    record = _record(
+        session,
+        room,
+        ReadingStatus.BASELINE,
+        "",
+        settings.timezone,
+        reading=pending["reading"],
+        serial=pending["serial"],
+        unit_label=UNIT_LABELS.get(room.meter_type),
+    )
+    try:
+        table.commit_reading(record, link_serial=pending["serial"])
+    except Conflict as conflict:
+        table.put_session(session)
+        raise (METER_TAKEN if conflict.reason == "meter_taken" else ROOM_HAS_METER) from conflict
+    session.closed = True
+    table.put_session(session)
+    return {"action": "linked", "saved": _saved_view(record), "summary": summarize(session.trace)}
