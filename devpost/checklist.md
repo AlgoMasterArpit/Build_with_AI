@@ -111,3 +111,4 @@ Reflection: not started
 Activity mode: not started
 
 ## Revisions
+- Slice 2 started before slice 1's real-photo probe — the learner's 204/205 photos were not yet available; slice 1 stays unchecked until the probe runs on them, and slice 2 does not depend on OCR results.
