@@ -5,6 +5,7 @@ import { cameraScreen } from "./screens/camera.js";
 import { actionBar, photoPanel } from "./screens/result.js";
 import { roomScreen } from "./screens/room.js";
 import { roomsScreen } from "./screens/rooms.js";
+import { agentSteps, savedCard } from "./screens/saved.js";
 
 const app = /** @type {HTMLElement} */ (document.getElementById("app"));
 
@@ -42,6 +43,17 @@ async function showRooms() {
 
 async function showRoom(roomId) {
   const room = await api(`/rooms/${encodeURIComponent(roomId)}`);
+  if (room.status === "done") {
+    const latest = await api(`/rooms/${encodeURIComponent(roomId)}/latest`);
+    render(app,
+      h("section", { class: "result" },
+        h("button", { class: "back", onClick: goRooms }, "‹ Rooms"),
+        h("h2", {}, `Room ${roomId}`),
+        savedCard(latest.saved),
+        agentSteps(latest.summary)),
+      actionBar("Rooms pe wapas", goRooms));
+    return;
+  }
   render(app, ...roomScreen(room, {
     back: goRooms,
     takePhoto: () => { location.hash = `#/camera/${roomId}`; },
@@ -115,10 +127,14 @@ function showResult(url, result) {
   const roomId = visit?.roomId ?? "";
   const problem = result.action === "retake" || result.action === "new_photo";
   const tone = problem ? "problem" : result.action === "review" ? "review" : "ok";
-  const panel = photoPanel(url, result, result.hint, tone);
+  const line = result.action === "review" ? "Review ke liye bhej diya" : result.hint;
+  const panel = photoPanel(url, result, line, tone);
   const body = [panel.panel];
 
-  if (result.action === "save" || result.action === "confirm") {
+  if (result.saved) {
+    body.push(savedCard(result.saved), agentSteps(result.summary));
+    navigator.vibrate?.(60);
+  } else if (result.action === "confirm") {
     body.push(h("div", { class: "reading-block" },
       h("span", {}, "Reading"),
       h("span", { class: "reading mono" }, result.display?.text ?? "")));
@@ -126,8 +142,9 @@ function showResult(url, result) {
   if (result.action === "review") {
     body.push(h("div", { class: "review-card" },
       h("h1", {}, `Room ${roomId} review ke liye bhej diya`),
-      h("p", {}, result.reason),
-      h("p", {}, "Reading save nahi hui. Aap agle room pe ja sakte ho.")));
+      h("p", {}, result.hint),
+      h("p", {}, "Reading save nahi hui. Aap agle room pe ja sakte ho.")),
+    agentSteps(result.summary));
   }
 
   const bar = problem
@@ -136,10 +153,10 @@ function showResult(url, result) {
       ? actionBar("Agle room pe jao", goRooms)
       : actionBar("Rooms pe wapas", goRooms);
   render(app, h("section", { class: "result" }, ...body), bar);
-  playSteps(panel, result, tone);
+  playSteps(panel, result, tone, line);
 }
 
-function playSteps(panel, result, tone) {
+function playSteps(panel, result, tone, finalLine) {
   const reread = result.steps?.find((s) => s.step === "reread");
   const first = result.steps?.find((s) => s.step === "perceive");
   if (!reread || !first || !result.display) {
@@ -148,12 +165,11 @@ function playSteps(panel, result, tone) {
   }
   const threshold = result.display.threshold;
   const unclear = first.confidences.map((c, i) => (c < threshold ? i : -1)).filter((i) => i >= 0);
-  const finalHint = result.hint;
   panel.say("Ek digit saaf nahi, dobara padh raha hoon.", "info");
   panel.redraw({ confidences: first.confidences, unclear });
   setTimeout(() => {
     panel.redraw();
-    panel.say(finalHint, tone);
+    panel.say(finalLine, tone);
   }, 1400);
 }
 
