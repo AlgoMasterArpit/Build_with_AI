@@ -29,7 +29,7 @@ Build mode: fast
   Learner check: Open the round link on the laptop, look at the rooms list and Room 205's screen in light and dark mode, and say whether it feels like the work tool you described.
   Commit: `feat: round link, rooms list and room screen on DynamoDB`
 
-- [ ] **3. A photo of Room 205's meter gets a retake hint or a straightened reading with digit boxes**
+- [x] **3. A photo of Room 205's meter gets a retake hint or a straightened reading with digit boxes**
   Becomes usable: Photo lo opens the full-screen camera with a frame guide; the captured full-resolution photo is uploaded; a glare/blur/dark photo comes back with red marks and one specific hint; a good photo comes back straightened with a box and confidence on every digit. Decisions come from the rules only.
   Why now: This is the kernel — the agent doubting the photo and saying exactly what to fix — so it comes before everything else on the phone.
   PRD ref: `prd.md > The Core Journey` (steps 4–6), `prd.md > Live Capture Only`, `prd.md > Photo Quality Check`, `prd.md > Reading the Display`
