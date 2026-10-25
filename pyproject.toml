@@ -1,0 +1,37 @@
+[project]
+name = "metermind"
+version = "0.1.0"
+description = "An agent that reads utility meters from live phone photos, doubts bad photos and decides what to do next."
+readme = "README.md"
+license = "MIT"
+requires-python = "==3.12.*"
+dependencies = [
+    "opencv-python-headless==5.0.0.93",
+    "numpy",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+exclude = ["^\\.venv/", "^agent/", "^\\.agents/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
