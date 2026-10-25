@@ -318,3 +318,8 @@ p { margin: 0; }
 .agent-steps .by.llm { border-color: var(--accent); color: var(--accent); }
 .result .back { justify-self: start; }
 .result > h2 { font-size: 2rem; }
+
+.confirm-card { display: grid; gap: 10px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.confirm-card h1 { font-size: 1.4rem; margin-top: 6px; }
+.action-bar.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.action-bar.two .button { max-width: none; margin: 0; }
