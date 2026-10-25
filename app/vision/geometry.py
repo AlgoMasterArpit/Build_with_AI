@@ -50,3 +50,14 @@ def quad_bounds(quad: Quad) -> tuple[int, int, int, int]:
 
 def scale_quad(quad: object, sx: float, sy: float) -> Quad:
     return [[round(float(x) * sx), round(float(y) * sy)] for x, y in np.asarray(quad).reshape(4, 2)]
+
+
+def split_quad(quad: Quad, parts: int) -> list[Quad]:
+    tl, tr, br, bl = order_quad(np.array(quad, dtype=np.float32))
+    pieces = []
+    for i in range(parts):
+        a, b = i / parts, (i + 1) / parts
+        top_a, top_b = tl + (tr - tl) * a, tl + (tr - tl) * b
+        bot_a, bot_b = bl + (br - bl) * a, bl + (br - bl) * b
+        pieces.append([[round(float(x)), round(float(y))] for x, y in (top_a, top_b, bot_b, bot_a)])
+    return pieces
