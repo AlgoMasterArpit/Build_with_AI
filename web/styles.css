@@ -323,3 +323,25 @@ p { margin: 0; }
 .confirm-card h1 { font-size: 1.4rem; margin-top: 6px; }
 .action-bar.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .action-bar.two .button { max-width: none; margin: 0; }
+
+.camera-note {
+  position: absolute;
+  top: calc(96px + env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  margin: 0;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: var(--radius);
+}
+.steps { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; }
+.link-button { display: grid; place-items: center; text-decoration: none; }
+
+.sketch { width: 100%; max-width: 360px; height: auto; }
+.sk-bar { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
+.sk-menu { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
+.sk-hot { fill: none; stroke: var(--accent); stroke-width: 3; }
+.sk-icon { fill: var(--text); }
+.sk-line { fill: none; stroke: var(--text); stroke-width: 2; }
+.sk-text { fill: var(--text); font: 600 14px var(--sans); }
+.sk-on { fill: var(--accent); }
