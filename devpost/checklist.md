@@ -19,7 +19,7 @@ Build mode: fast
   Learner check: Open the annotated photos in `probe_out/` and say whether the boxes sit on the serial and the digits, and whether the printed numbers match what you see on the meters.
   Commit: `feat(vision): OpenCV 5 pipeline with per-digit confidence and OCR probe`
 
-- [ ] **2. The round link opens the hostel's rooms list and a room screen**
+- [x] **2. The round link opens the hostel's rooms list and a room screen**
   Becomes usable: With the local moto server running and `seed/hostel_a.json` seeded, opening the printed round link in a browser shows "Hostel A · Meter round · Oct 2026", progress, every room with its status chip, and tapping a room opens its Room Screen (serial, previous reading, hint, Photo lo). A wrong token shows "Ye link sahi nahi hai…".
   Why now: Gives the kernel slices a real place to live: FastAPI serving the frontend, settings, DynamoDB through `AWS_ENDPOINT_URL`, and the Look and Feel base.
   PRD ref: `prd.md > Meter Round Link`, `prd.md > Rooms List`, `prd.md > Screens and Layout`, `prd.md > Look and Feel`
