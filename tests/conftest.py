@@ -12,8 +12,10 @@ from moto import mock_aws
 
 from app.config import Settings
 from app.main import create_app
+from app.store.photos import PhotoStore
 from app.store.seeding import seed_hostel
 from app.store.table import Table
+from app.vision.ocr import DETECTOR_FILE, RECOGNIZER_FILE
 
 ROOT = Path(__file__).resolve().parents[1]
 TOKEN = "test-round-token"
@@ -44,6 +46,7 @@ def aws() -> Iterator[None]:
 def table(aws: None, settings: Settings, hostel: dict[str, Any]) -> Table:
     table = Table(settings)
     table.create_if_missing()
+    PhotoStore(settings).create_if_missing()
     seed_hostel(table, hostel, token=TOKEN)
     return table
 
@@ -52,3 +55,9 @@ def table(aws: None, settings: Settings, hostel: dict[str, Any]) -> Table:
 def client(table: Table, settings: Settings) -> Iterator[TestClient]:
     with TestClient(create_app(settings), headers={"x-round-token": TOKEN}) as c:
         yield c
+
+
+@pytest.fixture
+def models_ready() -> None:
+    if not all((ROOT / "models" / name).exists() for name in (DETECTOR_FILE, RECOGNIZER_FILE)):
+        pytest.skip("models missing: run `uv run python scripts/fetch_models.py`")
