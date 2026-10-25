@@ -7,8 +7,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import logging as app_logging
-from app.api import errors, rounds
+from app.api import errors, rounds, sessions
 from app.config import Settings, get_settings
+from app.store.photos import PhotoStore
 from app.store.table import Table
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -21,10 +22,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="MeterMind", docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.settings = settings
     app.state.table = Table(settings)
+    app.state.photos = PhotoStore(settings)
 
     app.middleware("http")(app_logging.request_id_middleware)
     errors.install(app)
     app.include_router(rounds.router)
+    app.include_router(sessions.router)
 
     @app.get("/healthz", include_in_schema=False)
     def health() -> dict[str, str]:

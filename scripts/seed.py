@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import get_settings
+from app.store.photos import PhotoStore
 from app.store.seeding import seed_hostel
 from app.store.table import Table
 
@@ -24,6 +25,7 @@ def main() -> None:
     settings = get_settings()
     table = Table(settings)
     table.create_if_missing()
+    PhotoStore(settings).create_if_missing()
     data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     token = seed_hostel(table, data)
     print(f"{data['name']}: {len(data['rooms'])} rooms")
