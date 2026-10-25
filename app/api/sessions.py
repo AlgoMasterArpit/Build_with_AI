@@ -3,17 +3,24 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import BaseModel
 
 from app.agent.loop import Agent, AgentRun, RuleDecider
-from app.agent.policy import Action
+from app.agent.policy import Action, Decision
+from app.agent.summary import summarize
 from app.api.deps import RoundContext, RoundDep, SettingsDep, TableDep
 from app.api.errors import UNKNOWN_ROOM, ApiError
+from app.domain.factors import UNIT_LABELS, co2_kg
+from app.domain.readings import ReadingRecord, ReadingStatus
+from app.domain.rounds import Room, RoomStatus, status_for
 from app.domain.sessions import Mode, Session
+from app.domain.units import consumption, went_backwards
 from app.store.photos import PhotoStore
+from app.store.table import Conflict, Table
 from app.vision.client import build_vision
 from app.vision.geometry import split_quad
 from app.vision.pipeline import DIGIT_CONFIDENCE_THRESHOLD, decode_image
@@ -23,6 +30,8 @@ router = APIRouter(prefix="/api")
 SESSION_GONE = ApiError(404, "session_expired", "Session purana ho gaya, room dobara kholo.")
 NOT_A_PHOTO = ApiError(422, "not_a_photo", "Photo padh nahi paaye, dobara lo.")
 TOO_LARGE = ApiError(413, "photo_too_large", "Photo bahut badi hai, dobara lo.")
+ROOM_DONE = ApiError(409, "room_done", "Is room ki reading is mahine ho chuki hai.")
+BACKWARDS_REASON = "Reading pichhli se kam hai."
 
 
 class SessionCreated(BaseModel):
@@ -58,6 +67,8 @@ def start_session(
     room = table.get_room(ctx.hostel_id, room_id)
     if room is None:
         raise UNKNOWN_ROOM
+    if status_for(room, ctx.round_id) == RoomStatus.DONE:
+        raise ROOM_DONE
     session = Session(
         session_id=uuid.uuid4().hex,
         hostel_id=ctx.hostel_id,
@@ -144,16 +155,112 @@ def submit_photo(
     session.photo_keys.append(key)
 
     run = get_agent(request).run(image, session, room.meter_serial)
+    _guard_backwards(run, room)
+    session.trace.extend({"photo": index, **s} for s in run.steps)
+
     view = _view(run)
     view["photo"] = {
         "index": index,
         "location": place,
         "resolution": f"{image.shape[1]}x{image.shape[0]}",
     }
-    session.trace.extend({"photo": index, **s} for s in run.steps)
+    view |= _finish(table, session, room, run, place)
+    view["summary"] = summarize(session.trace)
     session.responses[client_photo_id] = view
     table.put_session(session)
     return view
+
+
+@router.get("/rooms/{room_id}/latest")
+def latest(room_id: str, ctx: RoundDep, table: TableDep) -> dict[str, Any]:
+    record = table.latest_reading(ctx.hostel_id, room_id, ctx.round_id)
+    if record is None:
+        raise ApiError(404, "no_reading", "Is mahine ki reading abhi nahi hui.")
+    return {"saved": _saved_view(record), "summary": summarize(record.trace)}
+
+
+def _guard_backwards(run: AgentRun, room: Room) -> None:
+    display = run.analysis.display
+    if run.decision.action != Action.SAVE or display is None:
+        return
+    if went_backwards(room.previous_reading, display.text):
+        run.decision = Decision(Action.REVIEW, BACKWARDS_REASON, "backwards")
+        run.steps.append(
+            {
+                "step": "decide",
+                "action": "review",
+                "decided_by": "rule",
+                "reason": "backwards",
+                "hint": BACKWARDS_REASON,
+                "ms": 0.0,
+            }
+        )
+
+
+def _record(
+    session: Session, room: Room, status: ReadingStatus, place: str, **fields: Any
+) -> ReadingRecord:
+    return ReadingRecord(
+        hostel_id=session.hostel_id,
+        room_id=session.room_id,
+        round_id=session.round_id,
+        recorded_at=datetime.now(UTC).isoformat(timespec="milliseconds"),
+        status=status,
+        meter_type=room.meter_type,
+        session_id=session.session_id,
+        photo_keys=list(session.photo_keys),
+        trace=list(session.trace),
+        location=place,
+        **fields,
+    )
+
+
+def _saved_view(record: ReadingRecord) -> dict[str, Any]:
+    return {
+        "status": record.status.value,
+        "reading": record.reading,
+        "units": record.units,
+        "unit_label": record.unit_label,
+        "co2_kg": record.co2_kg,
+        "recorded_at": record.recorded_at,
+    }
+
+
+def _finish(
+    table: Table, session: Session, room: Room, run: AgentRun, place: str
+) -> dict[str, Any]:
+    action = run.decision.action
+    display = run.analysis.display
+    if action == Action.SAVE and display is not None:
+        units = consumption(room.previous_reading, display.text)
+        record = _record(
+            session,
+            room,
+            ReadingStatus.SAVED,
+            place,
+            reading=display.text,
+            serial=room.meter_serial,
+            units=units,
+            unit_label=UNIT_LABELS.get(room.meter_type),
+            co2_kg=co2_kg(room.meter_type, units),
+        )
+    elif action == Action.REVIEW:
+        record = _record(
+            session,
+            room,
+            ReadingStatus.NEEDS_REVIEW,
+            place,
+            reason=run.decision.hint,
+            reading=display.text if display else None,
+        )
+    else:
+        return {}
+    try:
+        table.commit_reading(record)
+    except Conflict as conflict:
+        raise ROOM_DONE from conflict
+    session.closed = True
+    return {"saved": _saved_view(record)} if record.counts_as_reading else {}
 
 
 def _location(raw: str) -> str:
