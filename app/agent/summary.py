@@ -46,5 +46,6 @@ def summarize(trace: list[dict[str, Any]]) -> list[dict[str, str]]:
             continue
         label = _label(step, quality.get(photo, []))
         if label:
-            lines.append({"label": label, "decided_by": str(step.get("decided_by", "opencv"))})
+            by = str(step.get("decided_by", "opencv"))
+            lines.append({"label": label, "decided_by": "rule" if by.startswith("rule") else by})
     return lines
