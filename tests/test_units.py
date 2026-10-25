@@ -22,17 +22,37 @@ def test_co2_only_where_a_factor_exists() -> None:
 def test_summary_reads_like_the_demo() -> None:
     trace = [
         {"photo": 1, "step": "perceive", "quality": ["glare"]},
-        {"photo": 1, "step": "decide", "action": "retake", "reason": "bad_photo",
-         "decided_by": "llm"},
+        {
+            "photo": 1,
+            "step": "decide",
+            "action": "retake",
+            "reason": "bad_photo",
+            "decided_by": "llm",
+        },
         {"photo": 2, "step": "perceive", "quality": []},
-        {"photo": 2, "step": "decide", "action": "retake", "reason": "mismatch",
-         "decided_by": "rule"},
+        {
+            "photo": 2,
+            "step": "decide",
+            "action": "retake",
+            "reason": "mismatch",
+            "decided_by": "rule",
+        },
         {"photo": 3, "step": "perceive", "quality": []},
-        {"photo": 3, "step": "decide", "action": "reread", "reason": "unclear_digit",
-         "decided_by": "rule"},
+        {
+            "photo": 3,
+            "step": "decide",
+            "action": "reread",
+            "reason": "unclear_digit",
+            "decided_by": "rule",
+        },
         {"photo": 3, "step": "reread", "variant": "clahe"},
-        {"photo": 3, "step": "decide", "action": "save", "reason": "clear_reading",
-         "decided_by": "rule"},
+        {
+            "photo": 3,
+            "step": "decide",
+            "action": "save",
+            "reason": "clear_reading",
+            "decided_by": "rule",
+        },
     ]
     assert [line["label"] for line in summarize(trace)] == [
         "Glare: retake",
