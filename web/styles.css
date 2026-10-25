@@ -289,3 +289,32 @@ p { margin: 0; }
   background: var(--surface);
 }
 .review-card h1 { font-size: 1.2rem; }
+
+.saved-card {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 2px solid var(--done);
+  background: var(--surface);
+}
+.saved-head { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--done); }
+.tick { width: 28px; height: 28px; stroke: var(--done); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.saved-card .reading { font-size: 3rem; line-height: 1.1; margin: 4px 0; }
+.saved-when { color: var(--text-soft); }
+
+.agent-steps { display: grid; gap: 8px; }
+.agent-steps h2 { font-size: 1.1rem; }
+.agent-steps ol { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; }
+.agent-steps li { padding-left: 4px; }
+.agent-steps .by {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.95rem;
+}
+.agent-steps .by.llm { border-color: var(--accent); color: var(--accent); }
+.result .back { justify-self: start; }
+.result > h2 { font-size: 2rem; }
