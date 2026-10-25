@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import BaseModel
@@ -164,7 +165,7 @@ def submit_photo(
         "location": place,
         "resolution": f"{image.shape[1]}x{image.shape[0]}",
     }
-    view |= _finish(table, session, room, run, place)
+    view |= _finish(table, session, room, run, place, settings.timezone)
     view["summary"] = summarize(session.trace)
     session.responses[client_photo_id] = view
     table.put_session(session)
@@ -198,13 +199,13 @@ def _guard_backwards(run: AgentRun, room: Room) -> None:
 
 
 def _record(
-    session: Session, room: Room, status: ReadingStatus, place: str, **fields: Any
+    session: Session, room: Room, status: ReadingStatus, place: str, tz: str, **fields: Any
 ) -> ReadingRecord:
     return ReadingRecord(
         hostel_id=session.hostel_id,
         room_id=session.room_id,
         round_id=session.round_id,
-        recorded_at=datetime.now(UTC).isoformat(timespec="milliseconds"),
+        recorded_at=datetime.now(ZoneInfo(tz)).isoformat(timespec="milliseconds"),
         status=status,
         meter_type=room.meter_type,
         session_id=session.session_id,
@@ -227,7 +228,7 @@ def _saved_view(record: ReadingRecord) -> dict[str, Any]:
 
 
 def _finish(
-    table: Table, session: Session, room: Room, run: AgentRun, place: str
+    table: Table, session: Session, room: Room, run: AgentRun, place: str, tz: str
 ) -> dict[str, Any]:
     action = run.decision.action
     display = run.analysis.display
@@ -238,6 +239,7 @@ def _finish(
             room,
             ReadingStatus.SAVED,
             place,
+            tz,
             reading=display.text,
             serial=room.meter_serial,
             units=units,
@@ -250,6 +252,7 @@ def _finish(
             room,
             ReadingStatus.NEEDS_REVIEW,
             place,
+            tz,
             reason=run.decision.hint,
             reading=display.text if display else None,
         )
