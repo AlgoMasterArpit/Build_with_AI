@@ -3,3 +3,12 @@
 .env.*
 !.env.example
 .claude/
+
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+/models/*.onnx
+/probe_out/
