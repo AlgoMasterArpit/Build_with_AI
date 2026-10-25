@@ -13,3 +13,4 @@ __pycache__/
 /models/*.onnx
 /probe_out/
 /.playwright-mcp/
+/web/_e2e/
