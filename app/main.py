@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 from app import logging as app_logging
 from app.api import errors, rounds, sessions
@@ -13,6 +15,13 @@ from app.store.photos import PhotoStore
 from app.store.table import Table
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+
+class RevalidatedStaticFiles(StaticFiles):
+    def file_response(self, *args: Any, **kwargs: Any) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -37,7 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def round_page(token: str) -> FileResponse:
         return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+    app.mount("/static", RevalidatedStaticFiles(directory=WEB_DIR), name="static")
     return app
 
 
