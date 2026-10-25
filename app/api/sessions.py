@@ -10,8 +10,9 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import BaseModel
 
-from app.agent.loop import Agent, AgentRun, RuleDecider
+from app.agent.loop import Agent, AgentRun
 from app.agent.policy import Action, Decision
+from app.agent.providers import build_decider
 from app.agent.summary import summarize
 from app.api.deps import RoundContext, RoundDep, SettingsDep, TableDep
 from app.api.errors import UNKNOWN_ROOM, ApiError
@@ -48,7 +49,9 @@ def get_agent(request: Request) -> Agent:
     agent: Agent | None = getattr(request.app.state, "agent", None)
     if agent is None:
         settings = request.app.state.settings
-        agent = Agent(build_vision(settings.models_dir, settings.vision_url), RuleDecider())
+        agent = Agent(
+            build_vision(settings.models_dir, settings.vision_url), build_decider(settings)
+        )
         request.app.state.agent = agent
     return agent
 
