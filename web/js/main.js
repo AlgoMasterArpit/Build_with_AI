@@ -1,7 +1,10 @@
 import { api, ApiError, token } from "./api.js";
 import { CameraError, capturePhoto, closeCamera, openCamera } from "./camera.js";
 import { h, render } from "./dom.js";
+import { inAppBrowser } from "./inapp.js";
+import { locationJson, locationUnavailable, requestLocation } from "./location.js";
 import { cameraScreen } from "./screens/camera.js";
+import { cameraBlockedCard, openInChromeCard } from "./screens/help.js";
 import { actionBar, photoPanel } from "./screens/result.js";
 import { roomScreen } from "./screens/room.js";
 import { roomsScreen } from "./screens/rooms.js";
@@ -47,7 +50,7 @@ async function showRoom(roomId) {
     const latest = await api(`/rooms/${encodeURIComponent(roomId)}/latest`);
     render(app,
       h("section", { class: "result" },
-        h("button", { class: "back", onClick: goRooms }, "‹ Rooms"),
+        h("button", { class: "back", onClick: goRooms }, "â€¹ Rooms"),
         h("h2", {}, `Room ${roomId}`),
         savedCard(latest.saved),
         agentSteps(latest.summary)),
@@ -94,13 +97,20 @@ async function showCamera(roomId, hint) {
     stream = await openCamera(screen.video);
     screen.setBusy(false);
   } catch (error) {
+    if (error instanceof CameraError && error.kind === "blocked") {
+      render(app, ...cameraBlockedCard(() => showCamera(roomId, hint).catch(failed)));
+      return;
+    }
     if (error instanceof CameraError) {
       notice("Camera nahi khula", error.message,
-        { label: "Dobara try karo", run: () => showCamera(roomId, hint) });
+        { label: "Dobara try karo", run: () => showCamera(roomId, hint).catch(failed) });
       return;
     }
     throw error;
   }
+  requestLocation().then(() => {
+    if (locationUnavailable()) screen.note("Location band hai, photo phir bhi save hogi.");
+  });
 }
 
 async function submit(blob, photoId) {
@@ -110,7 +120,7 @@ async function submit(blob, photoId) {
   const form = new FormData();
   form.append("photo", blob, "photo.jpg");
   form.append("client_photo_id", photoId);
-  form.append("location", "{}");
+  form.append("location", locationJson());
   let result;
   try {
     result = await api(`/sessions/${visit?.sessionId}/photos`, { body: form, timeoutMs: 60000 });
@@ -219,6 +229,10 @@ async function route() {
   stream = null;
   if (!token) {
     notice("Link kaam nahi kar raha", "Ye link sahi nahi hai, admin se naya link maango.");
+    return;
+  }
+  if (inAppBrowser()) {
+    render(app, ...openInChromeCard());
     return;
   }
   const hash = location.hash;
